@@ -63,3 +63,7 @@ jobs:
           echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
           echo "GITHUB_SHA=$GITHUB_SHA"
           echo "RUNNER_OS=$RUNNER_OS"
+
+      - name: MMMamamia olala
+        run: |
+          echo "OwwwYEahhh"
