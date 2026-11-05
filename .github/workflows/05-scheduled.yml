@@ -1,0 +1,36 @@
+# =============================================================================
+# LESSON 5 — Scheduled (cron) workflows
+# =============================================================================
+# Runs automatically on a timer, like a cron job. Useful for nightly tests,
+# dependency checks, reports, cleanup...
+#
+# Cron syntax:  ┌ minute (0-59)
+#               │ ┌ hour (0-23, UTC!)
+#               │ │ ┌ day of month
+#               │ │ │ ┌ month
+#               │ │ │ │ ┌ day of week (0=Sun)
+#               * * * * *
+# Tip: https://crontab.guru helps you write these.
+# Note: schedules only run on the default branch, and may be delayed a bit.
+# =============================================================================
+name: "05 · Nightly Check"
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"     # every Monday at 03:00 UTC
+  workflow_dispatch:        # so you don't have to wait to try it
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      # Install the LATEST versions (not pinned) to catch breakage early.
+      - run: pip install pytest pytest-cov ruff
+      - run: pytest
+      - name: Report
+        if: always()
+        run: echo "Nightly run (${{ github.event_name }}) finished with status ${{ job.status }}"

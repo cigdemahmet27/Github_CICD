@@ -1,0 +1,121 @@
+# =============================================================================
+# LESSON 3 — A full CI/CD pipeline:  lint → test → build → deploy
+# =============================================================================
+# This is what a real-world pipeline looks like. New concepts:
+#   * `needs:`      job ORDER / dependencies (a chain of stages)
+#   * job OUTPUTS   pass a value from one job to another
+#   * artifacts     pass FILES from one job to another (jobs = separate VMs!)
+#   * `if:`         conditions (deploy only from the main branch)
+#   * permissions   give the token only the rights it needs
+#   * environments  a named deploy target ("github-pages"), shows the URL
+#
+# Result: your site is live at https://<user>.github.io/<repo>/
+# (One-time setup: Settings → Pages → Source: "GitHub Actions")
+# =============================================================================
+name: "03 · Full Pipeline (build & deploy)"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Default: the automatic GITHUB_TOKEN may only read the repo.
+permissions:
+  contents: read
+
+# Variables available to every job/step.
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ---------------------------------------------------------- stage 1: lint
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check . --output-format=github
+
+  # ---------------------------------------------------------- stage 2: test
+  test:
+    needs: lint                    # wait for lint to SUCCEED first
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -v
+
+  # ---------------------------------------------------------- stage 3: build
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+
+    # Declare job outputs so later jobs can read them.
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # A step sets an output by writing  key=value  to $GITHUB_OUTPUT.
+      # `id: meta` lets us refer to it as steps.meta.outputs.version
+      - name: Read app version
+        id: meta
+        run: |
+          VERSION=$(python -c "import app; print(app.__version__)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version $VERSION"
+
+      - name: Build the static site
+        run: python -m app.build_site
+
+      # Upload ./site in the special format GitHub Pages expects.
+      # (This is also an artifact you can download from the run page.)
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  # ---------------------------------------------------------- stage 4: deploy
+  deploy:
+    needs: build
+    # Only deploy for pushes to main — NOT for pull requests.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    # This job needs extra rights to publish to Pages.
+    permissions:
+      pages: write
+      id-token: write
+
+    # ENVIRONMENT: shows up under "Deployments" on the repo page, with a link.
+    # You can add protection rules (e.g. required reviewers) in Settings.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Use the output from the build job
+        run: echo "Deploying version ${{ needs.build.outputs.version }}"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Summary
+        run: |
+          echo "## 🚀 Deployed v${{ needs.build.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Live at: ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"

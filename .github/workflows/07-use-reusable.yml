@@ -1,0 +1,30 @@
+# =============================================================================
+# LESSON 6b — CALLING a reusable workflow
+# =============================================================================
+# Instead of `steps`, a job can `uses:` a whole workflow file.
+# =============================================================================
+name: "07 · Use Reusable Workflow"
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests-old-python:
+    uses: ./.github/workflows/06-reusable-tests.yml
+    with:
+      python-version: "3.11"
+
+  tests-new-python:
+    uses: ./.github/workflows/06-reusable-tests.yml
+    with:
+      python-version: "3.13"
+
+  report:
+    needs: [tests-old-python, tests-new-python]   # waits for BOTH
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Python 3.11 ran ${{ needs.tests-old-python.outputs.test-count }} tests"
+          echo "Python 3.13 ran ${{ needs.tests-new-python.outputs.test-count }} tests"

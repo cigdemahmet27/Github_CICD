@@ -1,0 +1,46 @@
+# =============================================================================
+# LESSON 7 — Releases: triggered by pushing a git TAG
+# =============================================================================
+# Try it:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+# → this workflow builds a zip and creates a GitHub Release with it attached.
+# =============================================================================
+name: "08 · Release"
+
+on:
+  push:
+    tags: ["v*"]            # only tags starting with "v" (v1.0.0, v2.1.3 ...)
+
+permissions:
+  contents: write           # needed to create a release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Test before releasing
+        run: |
+          pip install -r requirements-dev.txt
+          pytest
+
+      - name: Build release package
+        run: |
+          python -m app.build_site
+          mkdir -p dist
+          zip -r "dist/app-${{ github.ref_name }}.zip" app site README.md
+
+      # The `gh` CLI is preinstalled on runners. GITHUB_TOKEN is created
+      # automatically for every run — no setup needed.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/*.zip \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes

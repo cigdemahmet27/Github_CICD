@@ -1,0 +1,39 @@
+# =============================================================================
+# LESSON 6a — A REUSABLE workflow (like a function)
+# =============================================================================
+# `on: workflow_call` means: this workflow doesn't run by itself — other
+# workflows CALL it, passing inputs. Write your test logic once, reuse
+# it everywhere (even from other repositories).
+# See 07-use-reusable.yml for the caller.
+# =============================================================================
+name: "06 · Reusable: run tests"
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        required: true
+    outputs:
+      test-count:
+        description: "How many tests ran"
+        value: ${{ jobs.test.outputs.count }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      count: ${{ steps.run.outputs.count }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Run tests and count them
+        id: run
+        run: |
+          pytest -q | tee result.txt
+          COUNT=$(grep -oE '[0-9]+ passed' result.txt | grep -oE '[0-9]+')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"

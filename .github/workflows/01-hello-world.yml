@@ -1,0 +1,65 @@
+# =============================================================================
+# LESSON 1 — The anatomy of a workflow
+# =============================================================================
+# A WORKFLOW is a YAML file in .github/workflows/. GitHub reads every file
+# there automatically. Structure:
+#
+#   workflow  ->  jobs  ->  steps
+#   (this file)   (run on a fresh VM)  (commands or actions, run in order)
+#
+# Open the "Actions" tab on GitHub to watch it run.
+# =============================================================================
+
+# The name shown in the Actions tab.
+name: "01 · Hello World"
+
+# `on` = TRIGGERS. When should this workflow run?
+on:
+  push:                  # every push to any branch
+  workflow_dispatch:     # also adds a "Run workflow" button in the Actions tab
+
+jobs:
+  # "say-hello" is the job ID (you choose it).
+  say-hello:
+    # RUNNER: the machine the job runs on. GitHub gives you a brand-new
+    # Ubuntu VM for every job, and throws it away afterwards.
+    runs-on: ubuntu-latest
+
+    steps:
+      # A step with `run:` executes shell commands.
+      - name: Say hello
+        run: echo "Hello from GitHub Actions! 👋"
+
+      # Multi-line commands use `|`
+      - name: Look around the runner machine
+        run: |
+          echo "OS info:"; uname -a
+          echo "Current folder: $(pwd)"
+          echo "Files here (empty — we haven't checked out the code yet!):"
+          ls -la
+
+      # A step with `uses:` runs an ACTION — reusable code from the
+      # marketplace. actions/checkout downloads your repo into the runner.
+      - name: Check out the repository code
+        uses: actions/checkout@v5
+
+      - name: Now the files are here
+        run: ls -la
+
+      # CONTEXTS: ${{ ... }} is an expression. `github` holds info about
+      # the event that triggered this run.
+      - name: Print some context information
+        run: |
+          echo "Triggered by event : ${{ github.event_name }}"
+          echo "Repository         : ${{ github.repository }}"
+          echo "Branch             : ${{ github.ref_name }}"
+          echo "Commit SHA         : ${{ github.sha }}"
+          echo "Who pushed         : ${{ github.actor }}"
+          echo "Run number         : ${{ github.run_number }}"
+
+      # GitHub also sets ENVIRONMENT VARIABLES with the same info.
+      - name: Same info, via environment variables
+        run: |
+          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          echo "RUNNER_OS=$RUNNER_OS"

@@ -1,0 +1,82 @@
+# =============================================================================
+# LESSON 4 — Manual runs with inputs, conditions, and failure handling
+# =============================================================================
+# Go to Actions → "04 · Manual Run" → "Run workflow". You'll get a form!
+# New concepts:
+#   * workflow_dispatch INPUTS (choice, boolean, string)
+#   * `if:` on steps
+#   * status functions: success(), failure(), always()
+#   * SECRETS and VARIABLES (Settings → Secrets and variables → Actions)
+# =============================================================================
+name: "04 · Manual Run (inputs & conditions)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Where to (pretend) deploy"
+        type: choice
+        options: [dev, staging, production]
+        default: dev
+      greeting:
+        description: "Message to print"
+        type: string
+        default: "Hello pipeline!"
+      simulate_failure:
+        description: "Make a step fail on purpose (to see failure handling)"
+        type: boolean
+        default: false
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show the inputs
+        run: |
+          echo "Environment : ${{ inputs.environment }}"
+          echo "Greeting    : ${{ inputs.greeting }}"
+          echo "Fail?       : ${{ inputs.simulate_failure }}"
+
+      - name: Only runs for production
+        if: inputs.environment == 'production'
+        run: echo "⚠️  Production! In a real pipeline you'd require an approval here."
+
+      - name: Only runs for dev or staging
+        if: inputs.environment != 'production'
+        run: echo "Safe environment, deploying freely."
+
+      # SECRETS are encrypted and masked (shown as ***) in logs.
+      # Create one: Settings → Secrets and variables → Actions → "New repository secret"
+      # named MY_SECRET. If it doesn't exist, it's just an empty string.
+      - name: Use a secret (safely)
+        env:
+          MY_SECRET: ${{ secrets.MY_SECRET }}
+        run: |
+          if [ -n "$MY_SECRET" ]; then
+            echo "Secret is set. Trying to print it: $MY_SECRET  (GitHub masks it!)"
+          else
+            echo "No MY_SECRET defined — create one to try this out."
+          fi
+
+      # VARIABLES (vars.*) are like secrets but NOT hidden — for plain config.
+      - name: Use a configuration variable
+        run: echo "APP_COLOR variable = '${{ vars.APP_COLOR || 'not set' }}'"
+
+      - name: Step that may fail
+        if: inputs.simulate_failure
+        run: |
+          echo "Failing on purpose..."
+          exit 1        # any non-zero exit code = step FAILS
+
+      # By default, after a failure every later step is SKIPPED...
+      - name: Runs only if everything succeeded
+        run: echo "✅ All good"
+
+      # ...unless you use failure() or always().
+      - name: Runs only when something failed (e.g. send an alert)
+        if: failure()
+        run: echo "❌ Something failed — this is where you'd notify Slack/email."
+
+      - name: Always runs (cleanup)
+        if: always()
+        run: echo "🧹 Cleanup runs no matter what."

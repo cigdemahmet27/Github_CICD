@@ -1,0 +1,87 @@
+# =============================================================================
+# LESSON 2 — Continuous Integration (CI): lint + test on every change
+# =============================================================================
+# New concepts:
+#   * push / pull_request triggers with branch + path filters
+#   * two jobs that run IN PARALLEL
+#   * MATRIX: run the same job on several Python versions
+#   * CACHING dependencies to make runs faster
+#   * ARTIFACTS: save files (coverage report) from a run
+#   * CONCURRENCY: cancel old runs when you push again
+# =============================================================================
+name: "02 · CI (lint + test)"
+
+on:
+  push:
+    branches: [main]
+    # Only run if code actually changed (editing README won't trigger CI).
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "requirements-dev.txt"
+      - "pyproject.toml"
+      - ".github/workflows/02-ci.yml"
+  pull_request:          # runs for every PR targeting main
+    branches: [main]
+  workflow_dispatch:
+
+# If you push twice quickly, cancel the first (now outdated) run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------- job 1
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:                       # `with:` passes inputs to an action
+          python-version: "3.12"
+          cache: pip                # cache downloaded packages between runs
+
+      - run: pip install -r requirements-dev.txt
+      - name: Ruff (style + errors)
+        run: ruff check . --output-format=github   # shows errors inline on the PR!
+
+  # ---------------------------------------------------------------- job 2
+  # lint and test have no `needs:`, so they run AT THE SAME TIME.
+  test:
+    runs-on: ubuntu-latest
+
+    # MATRIX: GitHub creates one job per combination -> 3 jobs here.
+    strategy:
+      fail-fast: false             # keep the other versions running if one fails
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    # Name shown in the UI, e.g. "test (py3.12)"
+    name: test (py${{ matrix.python-version }})
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: Run tests with coverage
+        run: pytest --cov=app --cov-report=term --cov-report=xml
+
+      # Save coverage.xml so you can download it from the run's summary page.
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-py${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+
+      # Write Markdown to the run's Summary page.
+      - name: Job summary
+        run: |
+          echo "### ✅ Tests passed on Python ${{ matrix.python-version }}" >> "$GITHUB_STEP_SUMMARY"
