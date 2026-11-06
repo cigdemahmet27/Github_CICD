@@ -53,7 +53,7 @@ jobs:
           echo "Triggered by event : ${{ github.event_name }}"
           echo "Repository         : ${{ github.repository }}"
           echo "Branch             : ${{ github.ref_name }}"
-          echo "github.ref_name"   : ${{ github.ref}}
+          echo "github.ref"        : ${{ github.ref}}
           echo "Commit SHA         : ${{ github.sha }}"
           echo "Who pushed         : ${{ github.actor }}"
           echo "Run number         : ${{ github.run_number }}"
