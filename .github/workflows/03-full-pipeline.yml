@@ -88,6 +88,7 @@ jobs:
         uses: actions/upload-pages-artifact@v4
         with:
           path: site
+          name: ahmadow-website
 
   # ---------------------------------------------------------- stage 4: deploy
   deploy:
@@ -114,6 +115,8 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: hamado-deployment-from-github-actions
 
       - name: Summary
         run: |
